@@ -119,9 +119,9 @@ def filter_input_data(df_weekly_data, start_date, end_date, holiday_file):
 
 def calculate_no_of_days(filtered_dataframe_24hr, filtered_dataframe_workday):
       # TODO: If this is number of dates, change variable to no_of_xyz
-    no_of_days_24hr =  len(filtered_dataframe_24hr['start_date'].unique())
-    no_of_days_workday =  len(filtered_dataframe_workday['start_date'].unique())
-
+    no_of_days_24hr =  7 #len(filtered_dataframe_24hr['start_date'].unique())
+    no_of_days_workday =  5 #len(filtered_dataframe_workday['start_date'].unique())
+ 
     # TODO: make the function name in sync with what is hapenning inside the function
     return no_of_days_24hr, no_of_days_workday
 
@@ -360,7 +360,8 @@ def generate_plots(labels, colors, stats_dict,stats_dict_workday, planned_summar
             #print(chart_data[env][:3] )
             ax[row, col].pie(chart_data[env][:3], colors=colors, shadow = False,  \
                              startangle=90, autopct=lambda p: '{:.2f}%'.          \
-                             format(round(p,2)) if p > 0 else '')
+                             format(round(p,2)) if p > 0 else '',
+                             labeldistance =1.5)
             ax[row, col].axis('equal')
             ax[row, col].text(0, 0, '{0} {1}'.format(env, title), va = 'center',  \
                               ha = 'center', fontsize=10, fontweight="bold")
