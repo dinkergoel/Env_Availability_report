@@ -115,13 +115,13 @@ def filter_input_data(df_weekly_data, start_date, end_date, holiday_file):
     filtered_dataframe_24hr = filtered_dataframe.loc[(filtered_dataframe['start_date'].isin(report_dates_24hr.date))]
     filtered_dataframe_workday = filtered_dataframe.loc[(filtered_dataframe['start_date'].isin(report_dates_workday.date))]   
 
-    return filtered_dataframe_24hr, filtered_dataframe_workday
+    return filtered_dataframe_24hr, filtered_dataframe_workday, report_dates_24hr, report_dates_workday 
 
-def calculate_no_of_days(filtered_dataframe_24hr, filtered_dataframe_workday):
+def calculate_no_of_days(report_dates_24hr, report_dates_workday):
       # TODO: If this is number of dates, change variable to no_of_xyz
-    no_of_days_24hr =  7 #len(filtered_dataframe_24hr['start_date'].unique())
-    no_of_days_workday =  5 #len(filtered_dataframe_workday['start_date'].unique())
- 
+    no_of_days_24hr =  len(report_dates_24hr)
+    no_of_days_workday = len(report_dates_workday)
+    
     # TODO: make the function name in sync with what is hapenning inside the function
     return no_of_days_24hr, no_of_days_workday
 
@@ -435,16 +435,15 @@ if __name__ == "__main__":
     
     #Weekly Plotss
     input_data = fetch_input_data(input_file)
-    filtered_dataframe_24hr, filtered_dataframe_workday = filter_input_data(input_data, start_date, end_date, holiday_file)
-    no_of_days_24hr, no_of_days_workday = calculate_no_of_days(filtered_dataframe_24hr, filtered_dataframe_workday)
-    
+    filtered_dataframe_24hr, filtered_dataframe_workday, report_dates_24hr, report_dates_workday = filter_input_data(input_data, start_date, end_date, holiday_file)
+    no_of_days_24hr, no_of_days_workday = calculate_no_of_days(report_dates_24hr, report_dates_workday)
     filtered_dataframe_24hr, filtered_dataframe_workday = calculate_downtime(filtered_dataframe_24hr, filtered_dataframe_workday)
     stats_dict, stats_dict_workday, planned_summary_stats, unplanned_summary_stats = calculate_statistics(filtered_dataframe_24hr, filtered_dataframe_workday, environments, no_of_days_24hr, no_of_days_workday)
     pages= [generate_plots(labels, colors, stats_dict,stats_dict_workday, planned_summary_stats, unplanned_summary_stats, environments, start_date, end_date)]
     
     
     #Historical Plots
-    hist_df_24hr, hist_df_workday = filter_input_data(input_data, historical_start_date, end_date, holiday_file)
+    hist_df_24hr, hist_df_workday, hist_report_dates_24hr, hist_report_dates_workday = filter_input_data(input_data, historical_start_date, end_date, holiday_file)
     hist_df_24hr, hist_df_workday = calculate_downtime(hist_df_24hr, hist_df_workday)
     hist_plot_data_24hr, hist_plot_data_workday, unplanned_hist_summary_stats = calculate_statistics_historical(hist_df_24hr, hist_df_workday, environments)
     #Add pages to final PDF file.
