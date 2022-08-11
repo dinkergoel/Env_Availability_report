@@ -60,9 +60,13 @@ def fetch_cmdline_options():
 #Fetching data from the excel
 def fetch_input_data(input_file):
     df_input_data = pd.read_excel(input_file, sheet_name='env_data')  
+    #Subtracting 1 minute from end_date
+    for i,val in df_input_data.iterrows():
+      if val['end_date'].time() == datetime.datetime(2022,1,1, 0, 0).time():
+        df_input_data.at[i, 'end_date'] = val['end_date'] - datetime.timedelta(minutes=1)
+    
     df_input_data['start_time'] = [d.time() for d in df_input_data['start_date']]
     df_input_data['end_time'] = [d.time() for d in df_input_data['end_date']]
-   
     return df_input_data
 
 #Split the downtimes for different dates in case the time exceeds 24 hours
@@ -102,26 +106,27 @@ def calculate_reporting_date_range(start_date, end_date, holiday_file):
     return report_dates_24hr, report_dates_workday
     
 #Filtering input data based on dates and timings
-def filter_input_data(df_weekly_data, start_date, end_date, holiday_file):
+def filter_input_data(df_input_data, start_date, end_date, holiday_file):
+    
     splitted_dates = [
-        elt for _, row in df_weekly_data.iterrows() for elt in split_date(row["Environment"],row["Category"], row["Planned"], row["start_date"].date(), row["end_date"].date(), row["summary"], row["start_time"], row["end_time"])
+        elt for _, row in df_input_data.iterrows() for elt in split_date(row["Environment"],row["Category"], row["Planned"], row["start_date"].date(), row["end_date"].date(), row["summary"], row["start_time"], row["end_time"])
     ]
     #Here, we have data for each individual date now
-    filtered_dataframe = pd.DataFrame(splitted_dates, columns=list(df_weekly_data.columns))
+    filtered_dataframe = pd.DataFrame(splitted_dates, columns=list(df_input_data.columns))
     #print(filtered_dataframe)
     #Filter out the rows for which we need the report for
     report_dates_24hr, report_dates_workday = calculate_reporting_date_range(start_date, end_date, holiday_file)
-   
+    print(len(report_dates_24hr), len(report_dates_workday))
     filtered_dataframe_24hr = filtered_dataframe.loc[(filtered_dataframe['start_date'].isin(report_dates_24hr.date))]
     filtered_dataframe_workday = filtered_dataframe.loc[(filtered_dataframe['start_date'].isin(report_dates_workday.date))]   
 
-    return filtered_dataframe_24hr, filtered_dataframe_workday, report_dates_24hr, report_dates_workday 
+    return filtered_dataframe_24hr, filtered_dataframe_workday, report_dates_24hr, report_dates_workday
 
 def calculate_no_of_days(report_dates_24hr, report_dates_workday):
       # TODO: If this is number of dates, change variable to no_of_xyz
     no_of_days_24hr =  len(report_dates_24hr)
     no_of_days_workday = len(report_dates_workday)
-    
+
     # TODO: make the function name in sync with what is hapenning inside the function
     return no_of_days_24hr, no_of_days_workday
 
@@ -236,8 +241,10 @@ def calculate_statistics_historical(hist_df_24hr, hist_df_workday, environments)
     
     #Calculate the statistics for 24 hr
     hist_df_24hr['start_date']  = pd.to_datetime(hist_df_24hr['start_date'])
+    #print(hist_df_24hr)
     hist_df_24hr = hist_df_24hr.groupby(['Environment','Planned','summary',
-                                         pd.Grouper(key='start_date', freq='W-SUN')])['downtime'].sum().reset_index().sort_values('start_date')
+                                         pd.Grouper(key='start_date', freq='W-FRI')])['downtime'].sum().reset_index().sort_values('start_date')
+    #print(hist_df_24hr)
     hist_df_24hr['start_date']  = hist_df_24hr['start_date'] - datetime.timedelta(days=6)
     hist_df_24hr['downtime'] = hist_df_24hr['downtime']/(1440*7) * 100
     for d in hist_df_24hr['start_date'].unique():
@@ -263,7 +270,7 @@ def calculate_statistics_historical(hist_df_24hr, hist_df_workday, environments)
     #Calculate the stats for workday 
     hist_df_workday['start_date']  = pd.to_datetime(hist_df_workday['start_date'])
     hist_df_workday = hist_df_workday.groupby(['Environment','Planned',
-                                               pd.Grouper(key='start_date', freq='W-SUN')])['downtime_workday'].sum().reset_index().sort_values('start_date')
+                                               pd.Grouper(key='start_date', freq='W-FRI')])['downtime_workday'].sum().reset_index().sort_values('start_date')
     hist_df_workday['start_date']  = hist_df_workday['start_date'] - datetime.timedelta(days=6)
     hist_df_workday['downtime_workday'] = hist_df_workday['downtime_workday']/(540*5) * 100
         
@@ -360,8 +367,8 @@ def generate_plots(labels, colors, stats_dict,stats_dict_workday, planned_summar
             #print(chart_data[env][:3] )
             ax[row, col].pie(chart_data[env][:3], colors=colors, shadow = False,  \
                              startangle=90, autopct=lambda p: '{:.2f}%'.          \
-                             format(round(p,2)) if p > 0 else '',
-                             labeldistance =1.5)
+                             format(round(p,2)) if p > 0 else '')
+                                                         
             ax[row, col].axis('equal')
             ax[row, col].text(0, 0, '{0} {1}'.format(env, title), va = 'center',  \
                               ha = 'center', fontsize=10, fontweight="bold")
@@ -400,7 +407,7 @@ def generate_plots(labels, colors, stats_dict,stats_dict_workday, planned_summar
                         fontweight="bold")
     fig.legend(labels=[f'{x}' for x in labels],bbox_to_anchor=(0.81, 0.96), \
                columnspacing = 10,prop={'size': 12}, ncol = 3)
-    fig.tight_layout() 
+    
     fig.subplots_adjust(top=0.93)
     return fig
         
@@ -415,28 +422,18 @@ def generate_pdf(pages):
 #Main Program            
 if __name__ == "__main__":
     print("Start of program\n")
-    environments = ['Development', 'Clone Pre Prod','Clone UAT']
+    environments = ['Development', 'Clone UAT', 'Clone Pre Prod']
     labels= ['Uptime', 'Planned Downtime', 'Unplanned Downtime']
     colors=['green', 'orange', 'red']
-    #input_file = '/content/drive/MyDrive/task_env_report_v1.0.xlsx'
 
-    #start_date = '07/30/2022' 
-    #end_date = '08/05/2022'
-    #start_date = datetime.datetime.strptime(start_date, '%m/%d/%Y')
-    #end_date = datetime.datetime.strptime(end_date, '%m/%d/%Y')
-    
-    #input_file = '/content/drive/MyDrive/task_env_report_v1.0.xlsx'
-    #holiday_file = '/content/drive/MyDrive/holiday.txt'
-    #historical_start_date = '06/20/2022'
-    #historical_start_date = datetime.datetime.strptime(historical_start_date, '%m/%d/%Y')
     start_date, end_date, historical_start_date, input_file, holiday_file = fetch_cmdline_options()
     
-    #start_date, end_date, historical_start_date, input_file, historical_input_file, holiday_file = fetch_cmdline_options()
     
-    #Weekly Plotss
+    #Weekly Plots
     input_data = fetch_input_data(input_file)
     filtered_dataframe_24hr, filtered_dataframe_workday, report_dates_24hr, report_dates_workday = filter_input_data(input_data, start_date, end_date, holiday_file)
     no_of_days_24hr, no_of_days_workday = calculate_no_of_days(report_dates_24hr, report_dates_workday)
+    
     filtered_dataframe_24hr, filtered_dataframe_workday = calculate_downtime(filtered_dataframe_24hr, filtered_dataframe_workday)
     stats_dict, stats_dict_workday, planned_summary_stats, unplanned_summary_stats = calculate_statistics(filtered_dataframe_24hr, filtered_dataframe_workday, environments, no_of_days_24hr, no_of_days_workday)
     pages= [generate_plots(labels, colors, stats_dict,stats_dict_workday, planned_summary_stats, unplanned_summary_stats, environments, start_date, end_date)]
